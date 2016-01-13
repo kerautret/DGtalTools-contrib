@@ -82,6 +82,13 @@ main(int argc,char **argv)
     Z3i::RealPoint p2 = theMeshRef.getVertex(aFace.at(1));
     Z3i::RealPoint center = (p0+p1+p2)/3.0;
     TPoint normal = ((p1-p0).crossProduct(p2 - p0)).getNormalized();      
+
+    //check if there is a null face~
+    if(std::isnan(normal[0])){
+        vectFaceErros.push_back(0);
+        continue;
+    }
+
     for (unsigned int j=0; j < theMeshComp.nbFaces(); j++){
       std::vector<unsigned int>  aFaceC = theMeshComp.getFace(j);
       
