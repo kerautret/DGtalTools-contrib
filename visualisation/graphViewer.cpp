@@ -98,6 +98,7 @@ int main( int argc, char** argv )
   std::vector<unsigned int> vectColMesh;
   std::vector<unsigned int> vectColVertex;
   std::vector<unsigned int> vectColEdge;
+  std::vector<unsigned int> vectColRoot {255, 0, 0, 255};
   std::string nameFileRadii;
   std::string meshName;
   std::string name;
@@ -106,12 +107,13 @@ int main( int argc, char** argv )
   app.add_option("--inputEdge,-e", nameFileEdge, "input file containing the edge list.")->required()->check(CLI::ExistingFile);
   app.add_flag("--autoEdge,-a", autoEdgeOpt, "generate edge list from vertex order.");
   app.add_flag("--cstRadSectionEdge,-s", cstRadSectionEdge,  "use constant radius along a section edge (tube representing the edges are of constant radius from the begin section until the end section of the tube.");
+  auto rootColOpt = app.add_option("--colorRoot,-C", vectColRoot, "Change the color (R,G,B,A) of the root vertex (by convention the first vertex)")->expected(4);
   auto inputRadiiOpt = app.add_option("--inputRadii,-r", nameFileRadii, "input file containing the radius for each vertex.");
   app.add_option("--ballRadius,-b", r, "radius of vertex balls.", true);
   auto addMeshOpt = app.add_option("--addMesh,-m", meshName, "add mesh in the display.");
-  auto meshColorOpt = app.add_option("--meshColor", vectColMesh, "specify the color of mesh.");
-  auto vertexColorOpt = app.add_option("--vertexColor", vectColVertex, "specify the color of vertex.");
-  auto edgeColorOpt = app.add_option("--edgeColor", vectColEdge, "specify the color of edges.");
+  auto meshColorOpt = app.add_option("--meshColor", vectColMesh, "specify the color of mesh.")->expected(4);
+  auto vertexColorOpt = app.add_option("--vertexColor", vectColVertex, "specify the color of vertex.")->expected(4);
+  auto edgeColorOpt = app.add_option("--edgeColor", vectColEdge, "specify the color of edges.")->expected(4);
   auto colormapOpt = app.add_flag("--colormap, -c","display vertex colored by order in vertex file or by radius scale if the radius file is specidfied (-r).");
   auto doSnapShotAndExitOpt = app.add_option("--doSnapShotAndExit,-d", name, "save display snapshot into file. Notes that the camera setting is set by default according the last saved configuration (use SHIFT+Key_M to save current camera setting in the Viewer3D). If the camera setting was not saved it will use the default camera setting.");
   
@@ -128,7 +130,9 @@ int main( int argc, char** argv )
   DGtal::Color meshColor(240,240,240);
   DGtal::Color edgeColor(240,240,240);
   DGtal::Color vertexColor(240,240,240);
-
+  DGtal::Color rootColor(vectColRoot[0], vectColRoot[1], vectColRoot[2], vectColRoot[3]);
+  
+  
   if(inputRadiiOpt->count() > 0)
     useRadiiFile = true;
 
@@ -192,8 +196,14 @@ int main( int argc, char** argv )
     Color currentColor;
     for ( int i=0 ; i<vectVertex.size() ; ++i )
     {
-      
-      currentColor = (useRadiiFile ? hueShade(vectRadii[i]*10000) : hueShade(i));
+      if (i==0 && rootColOpt->count() > 0)
+      {
+        currentColor = rootColor;
+      }
+      else
+      {
+        currentColor = (useRadiiFile ? hueShade(vectRadii[i]*10000) : hueShade(i));
+      }
       viewer << CustomColors3D( currentColor, currentColor );
       viewer.addBall(vectVertex[i], vectRadii[i]);
     }
@@ -204,10 +214,16 @@ int main( int argc, char** argv )
     {
         viewer << CustomColors3D( vertexColor, vertexColor );
     }
-    
-     for ( int i=0 ; i<vectVertex.size() ; ++i )
+    for ( int i=1 ; i<vectVertex.size() ; ++i )
     {
+      
       viewer.addBall(vectVertex[i], vectRadii[i]);
+    }
+    if( rootColOpt ->count() > 0){
+      viewer << CustomColors3D( rootColor , rootColor );     
+    }
+    if (vectVertex.size()>0){
+      viewer.addBall(vectVertex[0], vectRadii[0]);
     }
   }
 
