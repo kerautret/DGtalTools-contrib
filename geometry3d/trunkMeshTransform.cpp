@@ -180,7 +180,7 @@ struct TrunkDeformator {
     int myNbSectors;
     std::vector<double> mySectorShift;
     const PithSectionCenter& mySectionCenter;
-    
+    enum DeformType {LINEAR_SHIFT, V_ONDUL_SHIFT, H_ONDUL_SHIFT};
     TrunkDeformator(const PithSectionCenter &pSectCenter, double maxShift, double sectSize):
                     mySectionCenter(pSectCenter),
                     mySectorSize(sectSize){
@@ -192,13 +192,33 @@ struct TrunkDeformator {
             mySectorShift.push_back(shift);
         }
     }
-    Z3i::RealPoint deform(const Z3i::RealPoint &pt, const Z3i::RealPoint &ptCyl) const {
+    Z3i::RealPoint deform(const Z3i::RealPoint &pt, Z3i::RealPoint ptCyl,
+                          DeformType defType = DeformType::V_ONDUL_SHIFT,
+                          double freq = 5.0) const {
         Z3i::RealPoint res = pt;
+        double ratioZ = (pt[2]-mySectionCenter.myMinZ)/(mySectionCenter.myMaxZ-mySectionCenter.myMinZ);
+        if (defType == H_ONDUL_SHIFT) {
+            ptCyl[1] = ptCyl[1] + sin(ratioZ*freq);
+        }
         unsigned int sectInd = (unsigned int) floor(ptCyl[1]/mySectorSize);
         double posA = (((double) sectInd)*mySectorSize+mySectorSize/2.0)-ptCyl[1];
         double gCoef = gaussF(posA, 0, mySectorSize/4.0 );
-        double ratioZ = (pt[2]-mySectionCenter.myMinZ)/(mySectionCenter.myMaxZ-mySectionCenter.myMinZ);
-        double hShift = mySectorShift[sectInd]*ratioZ*gCoef*0.5;
+        double hShift = 0.0;
+        switch (defType) {
+            case DeformType::LINEAR_SHIFT:
+                hShift = mySectorShift[sectInd]*ratioZ*gCoef*0.5;
+                break;
+            case DeformType::V_ONDUL_SHIFT:
+                hShift = cos(M_PI*freq*ratioZ)*gCoef*100;
+                break;
+            case DeformType::H_ONDUL_SHIFT:
+                hShift = mySectorShift[sectInd]*ratioZ*gCoef*0.5;
+                break;
+
+            default:
+                break;
+        }
+        // double hShift = mySectorShift[sectInd]*ratioZ*gCoef*0.5;
         res = res  + (pt-mySectionCenter.pithRepresentant(pt)).getNormalized()*hShift;
         return res;
     }
