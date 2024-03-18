@@ -177,24 +177,26 @@ struct TrunkAngularSamplor {
 struct TrunkDeformator {
     double mySectorSize;
     double myMinZ, myMaxZ;
+    double myMaxShift;
     int myNbSectors;
     std::vector<double> mySectorShift;
     const PithSectionCenter& mySectionCenter;
     enum DeformType {LINEAR_SHIFT, V_ONDUL_SHIFT, H_ONDUL_SHIFT};
     TrunkDeformator(const PithSectionCenter &pSectCenter, double maxShift, double sectSize):
                     mySectionCenter(pSectCenter),
-                    mySectorSize(sectSize){
+                    mySectorSize(sectSize),
+                    myMaxShift(maxShift){
         myNbSectors = (int)floor((2.0*M_PI) / mySectorSize);
         std::srand((unsigned int) std::time(NULL));
         for (unsigned int i = 0; i < myNbSectors; i++){
-            double shift = rand()%((int)floor(2000.0*maxShift));
+            double shift = rand()%((int)floor(2000.0*myMaxShift));
             shift /= 2000.0;
             mySectorShift.push_back(shift);
         }
     }
     Z3i::RealPoint deform(const Z3i::RealPoint &pt, Z3i::RealPoint ptCyl,
-                          DeformType defType = DeformType::V_ONDUL_SHIFT,
-                          double freq = 5.0) const {
+                          DeformType defType = DeformType::LINEAR_SHIFT,
+                          double freq = 1.0) const {
         Z3i::RealPoint res = pt;
         double ratioZ = (pt[2]-mySectionCenter.myMinZ)/(mySectionCenter.myMaxZ-mySectionCenter.myMinZ);
         if (defType == H_ONDUL_SHIFT) {
@@ -209,7 +211,7 @@ struct TrunkDeformator {
                 hShift = mySectorShift[sectInd]*ratioZ*gCoef*0.5;
                 break;
             case DeformType::V_ONDUL_SHIFT:
-                hShift = cos(M_PI*freq*ratioZ)*gCoef*100;
+                hShift = cos(2.0*M_PI*freq*ratioZ)*gCoef*myMaxShift;
                 break;
             case DeformType::H_ONDUL_SHIFT:
                 hShift = mySectorShift[sectInd]*ratioZ*gCoef*0.5;
@@ -247,6 +249,7 @@ int main( int argc, char** argv )
     double vSampleDist {5000.0};
     double vSampleAngularResol = 0.001;
     double vSampleAngularSensi = 0.1;
+    double zOndFreq = 1.0;
     
     usage << "Usage: " << argv[0] << " [input]\n"
     << "Typical use example:\n \t trunkMeshTransform ../Samples/TrunkSample/chene1.off -c ../Samples/TrunkSample/chene1-cyl  "
@@ -270,11 +273,12 @@ int main( int argc, char** argv )
     ->expected(3);
     auto vertSampleOpt = app.add_flag("--verticalSampling", "Apply a vertical sampling simulation by considering the laser scan.");
     app.add_option("--scannerDistance", vSampleDist, "Define the laser scan position distance. (effect only with --verticalSampling) .", true);
-    
     auto vROpt = app.add_option("--vSampleAngularResol", vSampleAngularResol, "Define the vertical angular resolution of the laser scanner. (effect only with --verticalSampling) ");
     auto vSOpt = app.add_option("--vSampleAngularSensi", vSampleAngularSensi, "Defines the vertical angular sensibility laser scan intersection detection. (effect only with --verticalSampling) ");
     auto outMesh = app.add_option("--outputMesh,-o,3", outputMesh, "Output mesh file name.");
     auto outPts = app.add_option("--outputPoints", outputPts, "Output pts file name");
+    auto vertOndOpt = app.add_option("--ZOndulation,-Z", zOndFreq, "use a vertical ondulation along the bark instead the shift parameter (the ondulation speed is  radian). ");
+
     app.get_formatter()->column_width(40);
     CLI11_PARSE(app, argc, argv);
     // END parse command line using CLI ----------------------------------------------
@@ -309,7 +313,7 @@ int main( int argc, char** argv )
     mainDir[0] = mainDirV[0];
     mainDir[1] = mainDirV[1];
     mainDir[2] = mainDirV[2];
-    
+    bool vertOnd = vertOndOpt->count()>0;
     // prepare resulting mesh
     for (auto it = aMesh.vertexBegin(); it != aMesh.vertexEnd(); it++){
         resultingMesh.addVertex(*it);
@@ -327,7 +331,12 @@ int main( int argc, char** argv )
         for (unsigned int i = 0; i < resultingMesh.nbVertex(); i++){
             Z3i::RealPoint &pt = resultingMesh.getVertex(i);
             Z3i::RealPoint ptCyl = cylCoordinates[i];
-            Z3i::RealPoint newP = tDef.deform(pt, ptCyl);
+            Z3i::RealPoint newP;
+            if (vertOnd){
+                newP = tDef.deform(pt, ptCyl, TrunkDeformator::DeformType::V_ONDUL_SHIFT, zOndFreq);
+            }else {
+                newP = tDef.deform(pt, ptCyl);
+            }
             pt[0] = newP[0]; pt[1] = newP[1]; pt[2] = newP[2];
         }
     }
