@@ -181,7 +181,7 @@ struct TrunkDeformator {
     int myNbSectors;
     std::vector<double> mySectorShift;
     const PithSectionCenter& mySectionCenter;
-    enum DeformType {LINEAR_SHIFT, V_ONDUL_SHIFT, H_ONDUL_SHIFT};
+    enum DeformType {LINEAR_SHIFT, LONGI_ONDUL_SHIFT, RADIAL_ONDUL_SHIFT, LONGIRADIAL_ONDUL_SHIFT};
     TrunkDeformator(const PithSectionCenter &pSectCenter, double maxShift, double sectSize):
                     mySectionCenter(pSectCenter),
                     mySectorSize(sectSize),
@@ -196,13 +196,13 @@ struct TrunkDeformator {
     }
     Z3i::RealPoint deform(const Z3i::RealPoint &pt, Z3i::RealPoint ptCyl,
                           DeformType defType = DeformType::LINEAR_SHIFT,
-                          double freq = 1.0) const {
+                          double freqL = 1.0, double freqR = 1.0) const {
         Z3i::RealPoint res = pt;
         double ratioZ = (pt[2]-mySectionCenter.myMinZ)/(mySectionCenter.myMaxZ-mySectionCenter.myMinZ);
-        if (defType == H_ONDUL_SHIFT) {
-            ptCyl[1] = ptCyl[1] + sin(ratioZ*freq);
+        if (defType == RADIAL_ONDUL_SHIFT || defType == LONGIRADIAL_ONDUL_SHIFT) {
+            ptCyl[1] = ptCyl[1] + sin(ratioZ*freqR);
         }
-        unsigned int sectInd = (unsigned int) floor(ptCyl[1]/mySectorSize);
+        unsigned int sectInd = (unsigned int) floor(ptCyl[1]/mySectorSize)%myNbSectors;
         double posA = (((double) sectInd)*mySectorSize+mySectorSize/2.0)-ptCyl[1];
         double gCoef = gaussF(posA, 0, mySectorSize/4.0 );
         double hShift = 0.0;
@@ -210,13 +210,15 @@ struct TrunkDeformator {
             case DeformType::LINEAR_SHIFT:
                 hShift = mySectorShift[sectInd]*ratioZ*gCoef*0.5;
                 break;
-            case DeformType::V_ONDUL_SHIFT:
-                hShift = cos(2.0*M_PI*freq*ratioZ)*gCoef*myMaxShift;
+            case DeformType::LONGI_ONDUL_SHIFT :
+                hShift = cos(2.0*M_PI*freqL*ratioZ)*gCoef*myMaxShift;
                 break;
-            case DeformType::H_ONDUL_SHIFT:
+            case DeformType::RADIAL_ONDUL_SHIFT:
                 hShift = mySectorShift[sectInd]*ratioZ*gCoef*0.5;
                 break;
-
+            case DeformType::LONGIRADIAL_ONDUL_SHIFT:
+                hShift = cos(2.0*M_PI*freqL*ratioZ)*gCoef*myMaxShift*ratioZ;
+                break;
             default:
                 break;
         }
@@ -249,8 +251,9 @@ int main( int argc, char** argv )
     double vSampleDist {5000.0};
     double vSampleAngularResol = 0.001;
     double vSampleAngularSensi = 0.1;
-    double zOndFreq = 1.0;
-    
+    double lOndFreq = 1.0;
+    double rOndFreq = 1.0;
+
     usage << "Usage: " << argv[0] << " [input]\n"
     << "Typical use example:\n \t trunkMeshTransform ../Samples/TrunkSample/chene1.off -c ../Samples/TrunkSample/chene1-cyl  "
     <<"-p ../Samples/TrunkSample/chene1_centerline.xyz  resTransform.off -s 200 1  --outputPoints resTransform.pts  "
@@ -277,8 +280,10 @@ int main( int argc, char** argv )
     auto vSOpt = app.add_option("--vSampleAngularSensi", vSampleAngularSensi, "Defines the vertical angular sensibility laser scan intersection detection. (effect only with --verticalSampling) ");
     auto outMesh = app.add_option("--outputMesh,-o,3", outputMesh, "Output mesh file name.");
     auto outPts = app.add_option("--outputPoints", outputPts, "Output pts file name");
-    auto vertOndOpt = app.add_option("--ZOndulation,-Z", zOndFreq, "use a vertical ondulation along the bark instead the shift parameter (the ondulation speed is  radian). ");
+    auto lOndOpt = app.add_option("--LongOndulation,-L", lOndFreq, "deforms the trunk by using a vertical ondulation along the bark instead  the shift sector (the ondulation frequence given as arguments is defined with respect to the trunk length). ");
+    auto rOndOpt = app.add_option("--RadOndulation,-R", rOndFreq, "deforms the trunk by using a radial ondulation along the bark instead  the shift sector (the ondulation frequence given as arguments is defined with respect to the trunk length). ");
 
+    
     app.get_formatter()->column_width(40);
     CLI11_PARSE(app, argc, argv);
     // END parse command line using CLI ----------------------------------------------
@@ -313,7 +318,13 @@ int main( int argc, char** argv )
     mainDir[0] = mainDirV[0];
     mainDir[1] = mainDirV[1];
     mainDir[2] = mainDirV[2];
-    bool vertOnd = vertOndOpt->count()>0;
+    TrunkDeformator::DeformType defType = (lOndOpt->count()>0) ? TrunkDeformator::DeformType::LONGI_ONDUL_SHIFT :
+                                          (rOndOpt -> count() > 0) ? TrunkDeformator::DeformType::RADIAL_ONDUL_SHIFT:
+                                            TrunkDeformator::DeformType::LINEAR_SHIFT;
+
+    if (rOndOpt -> count() > 0 && lOndOpt->count()>0){
+        defType = TrunkDeformator::DeformType::LONGIRADIAL_ONDUL_SHIFT;
+    }
     // prepare resulting mesh
     for (auto it = aMesh.vertexBegin(); it != aMesh.vertexEnd(); it++){
         resultingMesh.addVertex(*it);
@@ -332,10 +343,24 @@ int main( int argc, char** argv )
             Z3i::RealPoint &pt = resultingMesh.getVertex(i);
             Z3i::RealPoint ptCyl = cylCoordinates[i];
             Z3i::RealPoint newP;
-            if (vertOnd){
-                newP = tDef.deform(pt, ptCyl, TrunkDeformator::DeformType::V_ONDUL_SHIFT, zOndFreq);
-            }else {
-                newP = tDef.deform(pt, ptCyl);
+            switch (defType) {
+                case TrunkDeformator::DeformType::LINEAR_SHIFT:
+                    newP = tDef.deform(pt, ptCyl);
+                    break;
+                case TrunkDeformator::DeformType::LONGI_ONDUL_SHIFT:
+                    newP = tDef.deform(pt, ptCyl, TrunkDeformator::DeformType::LONGI_ONDUL_SHIFT,
+                                       lOndFreq, rOndFreq);
+                    break;
+                case TrunkDeformator::DeformType::RADIAL_ONDUL_SHIFT:
+                    newP = tDef.deform(pt, ptCyl, TrunkDeformator::DeformType::RADIAL_ONDUL_SHIFT,
+                                       lOndFreq, rOndFreq);
+                    break;
+                case TrunkDeformator::DeformType::LONGIRADIAL_ONDUL_SHIFT:
+                    newP = tDef.deform(pt, ptCyl, TrunkDeformator::DeformType::LONGIRADIAL_ONDUL_SHIFT,
+                                       lOndFreq, rOndFreq);
+                    break;
+                default:
+                    break;
             }
             pt[0] = newP[0]; pt[1] = newP[1]; pt[2] = newP[2];
         }
