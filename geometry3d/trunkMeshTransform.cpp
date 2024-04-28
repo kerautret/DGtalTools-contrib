@@ -181,7 +181,7 @@ struct TrunkDeformator {
     int myNbSectors;
     std::vector<double> mySectorShift;
     const PithSectionCenter& mySectionCenter;
-    enum DeformType {LINEAR_SHIFT, LONGI_ONDUL_SHIFT, RADIAL_ONDUL_SHIFT, LONGIRADIAL_ONDUL_SHIFT};
+    enum DeformType {PITH_DEFORM, LINEAR_SHIFT, LONGI_ONDUL_SHIFT, RADIAL_ONDUL_SHIFT, LONGIRADIAL_ONDUL_SHIFT};
     TrunkDeformator(const PithSectionCenter &pSectCenter, double maxShift, double sectSize):
                     mySectionCenter(pSectCenter),
                     mySectorSize(sectSize),
@@ -224,6 +224,13 @@ struct TrunkDeformator {
         }
         // double hShift = mySectorShift[sectInd]*ratioZ*gCoef*0.5;
         res = res  + (pt-mySectionCenter.pithRepresentant(pt)).getNormalized()*hShift;
+        return res;
+    }
+    Z3i::RealPoint moveFromCenterLine(const Z3i::RealPoint &pt, Z3i::RealPoint ptCyl,
+                                      double fX, double fY, double fZ) const {
+        Z3i::RealPoint res = pt;
+        double ratioZ = (pt[2]-mySectionCenter.myMinZ)/(mySectionCenter.myMaxZ-mySectionCenter.myMinZ);
+        res = res  + Z3i::RealPoint(cos(ratioZ*fX),cos(ratioZ*fY), cos(ratioZ*fZ))*myMaxShift;
         return res;
     }
 };
@@ -321,7 +328,6 @@ int main( int argc, char** argv )
     TrunkDeformator::DeformType defType = (lOndOpt->count()>0) ? TrunkDeformator::DeformType::LONGI_ONDUL_SHIFT :
                                           (rOndOpt -> count() > 0) ? TrunkDeformator::DeformType::RADIAL_ONDUL_SHIFT:
                                             TrunkDeformator::DeformType::LINEAR_SHIFT;
-
     if (rOndOpt -> count() > 0 && lOndOpt->count()>0){
         defType = TrunkDeformator::DeformType::LONGIRADIAL_ONDUL_SHIFT;
     }
@@ -329,6 +335,7 @@ int main( int argc, char** argv )
     for (auto it = aMesh.vertexBegin(); it != aMesh.vertexEnd(); it++){
         resultingMesh.addVertex(*it);
     }
+    defType = TrunkDeformator::DeformType::PITH_DEFORM;
 
     // First sector extraction
     mainDir = mainDir.getNormalized();
@@ -359,6 +366,8 @@ int main( int argc, char** argv )
                     newP = tDef.deform(pt, ptCyl, TrunkDeformator::DeformType::LONGIRADIAL_ONDUL_SHIFT,
                                        lOndFreq, rOndFreq);
                     break;
+                case TrunkDeformator::DeformType::PITH_DEFORM:
+                    newP = tDef.moveFromCenterLine(pt, ptCyl, 5, 10, 3);
                 default:
                     break;
             }
