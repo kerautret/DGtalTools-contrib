@@ -62,12 +62,15 @@ using Domain        = DGtal::Z2i::Domain;
 using PolyMesh      = DGtal::PolygonalSurface<RealPoint>;
 using VertexRange   = PolyMesh::VertexRange;
 using Matrix3       = DGtal::SimpleMatrix<double, 3, 3>;
+using FaceIndex     = DGtal::PolygonalSurface<RealPoint>::FaceIndex;
+using VertexIndex     = DGtal::PolygonalSurface<RealPoint>::FaceIndex;
 
 template<typename TValue>
 using Image2D       = DGtal::ImageContainerBySTLVector<Domain, TValue>;
 
 
 const RealPoint::Component GLOBAL_epsilon = std::numeric_limits<RealPoint::Component>::epsilon();
+const FaceIndex NoFace = std::numeric_limits<FaceIndex>::max();
 
 
 Matrix3 makeYawRotationMatrix(double aTheta)
@@ -142,9 +145,9 @@ struct Ray
         PolyMesh::PositionsMap pos = aPolysurf.positions();
 
         // search for intersect
-        size_t i_min = -1;
+        FaceIndex i_min = NoFace;
         double t_min = std::numeric_limits<double>::infinity();
-        for(size_t i = 0; i < aPolysurf.nbFaces(); i++)
+        for(FaceIndex i = 0; i < aPolysurf.nbFaces(); i++)
         {
             VertexRange vertices = aPolysurf.verticesAroundFace(i);
 
@@ -165,7 +168,7 @@ struct Ray
         }
 
         // return face index and dist value
-        return std::pair<int, double>(i_min,t_min);
+        return std::pair<FaceIndex, double>(i_min,t_min);
     }
 };
 
@@ -195,14 +198,14 @@ struct SampledCenterline
         mySampleSize = (myMaxZ - myMinZ) / nbSamples;
 
         // populate sample list
-        size_t j_mem = 0;
+        FaceIndex j_mem = 0;
         RealPoint p1 = points[0];
         RealPoint p2 = points[0];
         for(size_t i = 0; i < nbSamples; i++)
         {
             double sampleHeight = myMinZ + mySampleSize/2 + mySampleSize * i;
 
-            for(int j = j_mem; j < points.size(); j++)
+            for(VertexIndex j = j_mem; j < points.size(); j++)
             {
                 p1 = p2;
                 p2 = points[j];
@@ -243,7 +246,7 @@ struct TrunkMapper
     struct CellData
     {
         // Members
-        int myFaceID;
+        FaceIndex myFaceID;
         double myDist;
         RealPoint myNormal;
 
@@ -252,7 +255,7 @@ struct TrunkMapper
             : myFaceID(-1), myDist(0)
         {}
 
-        CellData(int aFaceID, double aDist, const RealPoint& aNormal)
+        CellData(FaceIndex aFaceID, double aDist, const RealPoint& aNormal)
             : myFaceID(aFaceID), myDist(aDist), myNormal(aNormal)
         {}
     };
@@ -273,12 +276,12 @@ struct TrunkMapper
     {}
 
     // Methods
-    RealPoint faceBarycenter(int aFaceID)
+    RealPoint faceBarycenter(FaceIndex aFaceID)
     {
         VertexRange vertices = myTrunkMesh.verticesAroundFace(aFaceID);
 
         RealPoint avgPoint;
-        for(int vertID : vertices)
+        for(VertexIndex vertID : vertices)
         {
             avgPoint += myTrunkMesh.position(vertID);
         }
@@ -286,7 +289,7 @@ struct TrunkMapper
     }
 
 
-    RealPoint faceNormal(int aFaceID)
+    RealPoint faceNormal(FaceIndex aFaceID)
     {
         VertexRange vertices = myTrunkMesh.verticesAroundFace(aFaceID);
 
@@ -296,7 +299,7 @@ struct TrunkMapper
         return v1.crossProduct(v2).getNormalized();
     }
 
-    double intersectFace(int aFaceID, const Ray& aRay)
+    double intersectFace(FaceIndex aFaceID, const Ray& aRay)
     {
         VertexRange vertices = myTrunkMesh.verticesAroundFace(aFaceID);
         RealPoint p1 = myTrunkMesh.position(vertices[0]);
@@ -307,10 +310,10 @@ struct TrunkMapper
         return aRay.intersectTriangle(p1, p2, p3);
     }
 
-    CellData faceSearch(int aFaceID, const Ray& aRay, bool memory = true)
+    CellData faceSearch(FaceIndex aFaceID, const Ray& aRay, bool memory = true)
     {
         // contains the ID of faces that have been tested for intersection
-        std::set<int> visitedFaces;
+        std::set<FaceIndex> visitedFaces;
 
         // ordered set that contains candidates for intersection, and other data used to compare them
         auto cmp = [](const std::pair<int, double>& a, const std::pair<int, double>& b)
@@ -322,38 +325,38 @@ struct TrunkMapper
         while(flag)
         {
             // populate the candidates set with the unvisited neighbours of the last visited face
-            for(int vertID : myTrunkMesh.verticesAroundFace(aFaceID))
+            for(VertexIndex vertID : myTrunkMesh.verticesAroundFace(aFaceID))
             {
-                for(int faceID : myTrunkMesh.facesAroundVertex(vertID))
+                for(VertexIndex faceID : myTrunkMesh.facesAroundVertex(vertID))
                 {
                     if(visitedFaces.find(faceID) != visitedFaces.end())
                     {   // face already tested for intersection : skip it
                         continue;
                     }
-
+                    
                     // computing the dot product between the ray's direction and the face's barycenter
                     // the value of the dot product is used to sort the set
                     // higher value -> face is closer (angle wise) to the ray's direction
                     RealPoint faceCenterRN = (faceBarycenter(faceID) - aRay.myOrigin).getNormalized();
                     double dot = faceCenterRN.dot(aRay.myDirection);
-
+                    
                     candidateFaces.insert(std::pair<int, double>(faceID, dot));
                 }
             }
-
+            
             // iterator to the last element of the set (the face with the highest dot product value)
             auto bestCndtIterator = candidateFaces.rbegin();
             if(bestCndtIterator != candidateFaces.rend())
             {   // set has at least an element
                 double t = intersectFace(bestCndtIterator->first, aRay);
                 c++;
-
+                
                 if(t > 0)
                 {   // intersection, we stop here
                     RealPoint n = faceNormal(bestCndtIterator->first);
                     return CellData(bestCndtIterator->first, t, RealPoint(- n[2],
-                                                     n[0] * aRay.myDirection[1] - n[1] * aRay.myDirection[0],
-                                                     - n[0] * aRay.myDirection[0] - n[1] * aRay.myDirection[1]));
+                                                                          n[0] * aRay.myDirection[1] - n[1] * aRay.myDirection[0],
+                                                                          - n[0] * aRay.myDirection[0] - n[1] * aRay.myDirection[1]));
                 }
                 else
                 {   // no intersection, we mark the face as visited and do another loop
@@ -390,10 +393,10 @@ struct TrunkMapper
     }
 
 
-    CellData navigateMesh(int aFaceID, const Ray& aRay, bool memory = true)
+    CellData navigateMesh(FaceIndex aFaceID, const Ray& aRay, bool memory = true)
     {
         // search for best (local) fitting vertex (best fit = highest cos with ray direction)
-        int bestVertID = myTrunkMesh.verticesAroundFace(aFaceID)[0];
+        VertexIndex bestVertID = myTrunkMesh.verticesAroundFace(aFaceID)[0];
         double bestDot = aRay.myDirection.dot((myTrunkMesh.position(bestVertID) - aRay.myOrigin).getNormalized());
 
         bool bestCandidateFound = false;
@@ -416,7 +419,7 @@ struct TrunkMapper
             bestCandidateFound = !foundBetter;  // stop the loop if we have not found better candidate
         }
 
-        for(int faceID : myTrunkMesh.facesAroundVertex(bestVertID))
+        for(VertexIndex faceID : myTrunkMesh.facesAroundVertex(bestVertID))
         {
             double t = intersectFace(faceID, aRay);
 
@@ -439,14 +442,19 @@ struct TrunkMapper
         Matrix3 rotMat(makeYawRotationMatrix(2 * M_PI / myMapWidth));
 
         // loop over cells
-        int previousFaceID = -1;        // holds the previous cell ID, -1 if it's not available
+        FaceIndex previousFaceID = NoFace;        // holds the previous cell ID, -1 if it's not available
+ 
+        DGtal::trace.progressBar(0.0, myTrunkCenter.mySampledPoints.size());
+        
         for(size_t i = 0; i < myTrunkCenter.mySampledPoints.size(); i++)
         {
-            Ray ray(myTrunkCenter.mySampledPoints[i], RealPoint(1.0, 0.0, 0.0));
+            DGtal::trace.progressBar(i, myTrunkCenter.mySampledPoints.size());
 
+            Ray ray(myTrunkCenter.mySampledPoints[i], RealPoint(1.0, 0.0, 0.0));
+            
             for(size_t j = 0; j < myMapWidth; j++)
             {
-                if(previousFaceID != -1)
+                if(previousFaceID != NoFace)
                 {
                     myDataMap[i][j] = navigateMesh(previousFaceID, ray, false);
                 }
@@ -496,7 +504,7 @@ struct TrunkMapper
     {
         Domain dom(Point(0,0), Point(myMapWidth -1,myMapHeight -1));
         Image2D<double> distMapImage(dom);
-
+        double prev = 0.0;
         for(int i = 0; i < myMapHeight; i++)
         {
             for(int j = 0; j < myMapWidth; j++)
@@ -505,17 +513,19 @@ struct TrunkMapper
                 if(std::isfinite(d))
                 {
                     distMapImage.setValue(Point(j,i), myDataMap[i][j].myDist);
+                    prev = d;
                 }
                 else
                 {
-                    distMapImage.setValue(Point(j,i), 0);
+                    distMapImage.setValue(Point(j,i), prev);
                 }
             }
         }
 
         auto minmax = std::minmax_element(distMapImage.constRange().begin(), distMapImage.constRange().end());
-
+        DGtal::trace.info() << "Min max of distance map: " << *minmax.first << " " << *minmax.second << std::endl;
         DGtal::GradientColorMap<double, DGtal::CMAP_JET> distcolormap(*minmax.first, *minmax.second);
+
 
         DGtal::STBWriter< Image2D<double>, DGtal::GradientColorMap<double, DGtal::CMAP_JET> >::exportPNG(distMapFilename, distMapImage, distcolormap);
     }
@@ -533,9 +543,9 @@ struct TrunkMapper
                 double d = myDataMap[i][j].myDist;
                 if(std::isfinite(d))
                 {
-                    unsigned char r = (myDataMap[i][j].myNormal[0] + 1) * 127.5;
-                    unsigned char g = (myDataMap[i][j].myNormal[1] + 1) * 127.5;
-                    unsigned char b = 128 - myDataMap[i][j].myNormal[2] * 127;
+                    unsigned char r = (-myDataMap[i][j].myNormal[0] + 1) * 127.5;
+                    unsigned char g = (-myDataMap[i][j].myNormal[1] + 1) * 127.5;
+                    unsigned char b = 128 + myDataMap[i][j].myNormal[2] * 127;
 
                     /* if(b < 128)
                     {
@@ -562,6 +572,7 @@ struct TrunkMapper
         int patchHeight = 2;
         Domain dom(Point(0,0), Point(myMapWidth -1,myMapHeight -1));
         Image2D<double> deltaDistMapImage(dom);
+        double prev = 0.0;
 
         for(int i = 0; i < myMapHeight; i++)
         {
@@ -571,7 +582,9 @@ struct TrunkMapper
                 double d = myDataMap[i][j].myDist;
                 if(!std::isfinite(d))
                 {
-                    d = 0;
+                    d = prev;
+                }else{
+                    prev = d;
                 }
 
                 // compute average distance
@@ -612,8 +625,8 @@ struct TrunkMapper
         }
 
         auto minmax = std::minmax_element(deltaDistMapImage.constRange().begin(), deltaDistMapImage.constRange().end());
-
-        DGtal::GradientColorMap<double, DGtal::CMAP_JET> distcolormap(*minmax.first, *minmax.second);
+        DGtal::trace.info() << "Min max of delta distance map: " << *minmax.first << " " << *minmax.second << std::endl;
+        DGtal::GradientColorMap<double, DGtal::CMAP_JET> distcolormap(*minmax.first,*minmax.second);
 
         DGtal::STBWriter< Image2D<double>, DGtal::GradientColorMap<double, DGtal::CMAP_JET> >::exportPNG(deltaDistMapFilename, deltaDistMapImage, distcolormap);
     }
