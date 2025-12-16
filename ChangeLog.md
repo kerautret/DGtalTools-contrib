@@ -1,5 +1,8 @@
 
-
+# DGtalTools-contrib 2.1
+- *build* 
+  - polyscope version to fix CI. 
+    (Bertrand Kerautret [#97](https://github.com/DGtal-team/DGtalTools-contrib/pull/97))
 
 
 # DGtalTools-contrib 2.0
