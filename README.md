@@ -102,7 +102,7 @@ This section, can contain all tools related to visualisation:
 <table>
 <tr>
   <td align="center"><img width="95%" src="https://cloud.githubusercontent.com/assets/772865/12538777/cd8c2d28-c2e2-11e5-93ab-cb4a6cfadc8e.png"></td>
-  <td align="center" ><img width="95%" src="https://raw.githubusercontent.com/DGtal-team/DGtalTools-contrib/refs/heads/master/doc/images/previewGraphViewer.png"></td>
+  <td align="center" ><img width="95%" src="https://raw.githubusercontent.com/DGtal-team/DGtalTools-contrib/refs/heads/main/doc/images/previewGraphViewer.png"></td>
 </tr> 
  <tr>
  <td align="center">displayTgtCoverAlphaTS</td>
