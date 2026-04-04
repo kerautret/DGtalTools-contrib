@@ -2,13 +2,14 @@ if (TARGET polyscope)
   return()
 endif()
 
-include(FetchContent)
+set(CMAKE_CXX_FLAGS_DEBUG_OLD "${CMAKE_CXX_FLAGS_DEBUG}")
+set(CMAKE_CXX_FLAGS_DEBUG "-w")
 
-message(STATUS "Fetching polyscope")
+CPMAddPackage(
+  NAME polyscope
+  VERSION 2.4.0
+  GITHUB_REPOSITORY "nmwsharp/polyscope"
+)
 
-FetchContent_Declare(
-    polyscope
-    GIT_REPOSITORY https://github.com/nmwsharp/polyscope.git
-    GIT_SHALLOW    TRUE
-    )
-FetchContent_MakeAvailable(polyscope)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG_OLD}")
+

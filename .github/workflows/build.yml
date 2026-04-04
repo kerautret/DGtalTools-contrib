@@ -2,17 +2,17 @@ name: CI (linux/macOS)
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
     
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE:   Release
   CONFIG_GLOBAL: 
-  CONFIG_LINUX:  -DWITH_MAGICK=true -DWITH_GMP=true -DWITH_FFTW3=true -DWARNING_AS_ERROR=ON -DWITH_HDF5=true -DWITH_QGLVIEWER=true -DWITH_CAIRO=true  -DWITH_EIGEN=true -DDGTAL_ENABLE_FLOATING_POINT_EXCEPTIONS=true
-  CONFIG_MAC:    -DWITH_EIGEN=true -DWITH_GMP=tue
-  CONFIG_WINDOWS: -DWITH_OPENMP=true
+  CONFIG_LINUX:  -DWITH_MAGICK=true -DWITH_GMP=true -DWITH_FFTW3=true -DWARNING_AS_ERROR=ON -DWITH_HDF5=true -DDGTAL_WITH_POLYSCOPE_VIEWER=true -DWITH_CAIRO=true  -DWITH_EIGEN=true -DDGTAL_ENABLE_FLOATING_POINT_EXCEPTIONS=true
+  CONFIG_MAC:    -DWITH_EIGEN=true -DWITH_GMP=tue -DDGTAL_WITH_POLYSCOPE_VIEWER=true
+  CONFIG_WINDOWS: -DWITH_OPENMP=true -DDGTAL_WITH_POLYSCOPE_VIEWER=true
 
 jobs:
   build:
