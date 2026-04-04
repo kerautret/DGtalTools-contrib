@@ -84,7 +84,7 @@ include_directories( "${PROJECT_SOURCE_DIR}/ext/" )
 # -----------------------------------------------------------------------------
 # SET(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 SET(DGtalToolsContrib_VERSION_MAJOR 2)
-SET(DGtalToolsContrib_VERSION_MINOR 0)
+SET(DGtalToolsContrib_VERSION_MINOR 2)
 #SET(DGtalToolsContrib_VERSION_PATCH beta)
 SET(DGTALTOOLSContrib_VERSION "${DGtalToolsContrib_VERSION_MAJOR}.${DGtalToolsContrib_VERSION_MINOR}.${DGtalToolsContrib_VERSION_PATCH}")
 SET(PROJECT_VERSION "${DGtalToolsContrib_VERSION_MAJOR}.${DGtalToolsContrib_VERSION_MINOR}.${DGtalToolsContrib_VERSION_PATCH}")
