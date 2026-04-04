@@ -1,3 +1,11 @@
+# DGtalTools-contrib 2.2 (beta)
+
+- *global*
+  - Default branch set to main instead old master.
+   (Bertrand Kerautret [498](https://github.com/DGtal-team/DGtalTools/pull/98)) 
+
+
+
 
 # DGtalTools-contrib 2.1
 - *build* 
