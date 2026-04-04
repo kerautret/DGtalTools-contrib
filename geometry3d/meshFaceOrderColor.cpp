@@ -47,27 +47,41 @@ using namespace DGtal;
 
 
 /**
- @page meshOrderColor meshOrderColor
+ @page meshFaceOrderColor meshFaceOrderColor
  
- @brief  Description of the tool...
+ @brief  Colors a mesh based on face order and optionally sorts the faces
+ lexicographically.Usage: ./geometry3d/meshFaceOrderColor [input]
+ Typical use example:
+ meshFaceOrderColor $DGtal/examples/samples/bunnyhead.obj resColor.obj -s
 
  @b Usage:   meshOrderColor [input]
 
- @b Allowed @b options @b are :
- 
+ ./geometry3d/meshFaceOrderColor [OPTIONS] 1 2
+
  @code
-  -h [ --help ]           display this message
-  -i [ --input ] arg      an input file...
-  -p [ --parameter] arg   a double parameter...
+
+ POSITIONALS:
+   1 TEXT:FILE REQUIRED                  Input mesh
+   2 TEXT REQUIRED                       Output mesh
+
+ @b Allowed @b options @b are :
+
+ OPTIONS:
+   -h,        --help                     Print this help message and exit
+   -i,        --input TEXT:FILE REQUIRED Input mesh
+   -o,        --output TEXT REQUIRED     Output mesh
+   -s,        --sort-lexicographic       sorts the faces lexicographically.
+
+ 
+
  @endcode
 
  @b Example:
 
  @code
-     meshOrderColor -i  $DGtal/examples/samples/....
- @endcode
+       meshFaceOrderColor $DGtal/examples/samples/bunnyhead.obj resColor.obj -s
 
- @image html resmeshOrderColor.png "Example of result. "
+ @endcode
 
  @see
  @ref meshOrderColor.cpp
@@ -123,13 +137,13 @@ int main( int argc, char** argv )
     std::stringstream usage;
 
     usage << "Usage: " << argv[0] << " [input]\n"
-    << "Typical use example:\n \t meshOrderColor -i ... \n";
+    << "Typical use example:\n \t  meshFaceOrderColor $DGtal/examples/samples/bunnyhead.obj resColor.obj -s\n";
     // parse command line using CLI-------------------------------------------------------
     CLI::App app;
     app.description("Colors a mesh based on face order and optionally sorts the faces lexicographically." + usage.str() );
     app.add_option("--input,-i,1", inputFileName, "Input mesh")->required()->check(CLI::ExistingFile);
     app.add_option("--output,-o,2", outputFileName, "Output mesh")->required();
-    app.add_option("--sort-lexicographic,-s", sortLexico, "sorts the faces lexicographically.");
+    app.add_flag("--sort-lexicographic,-s", sortLexico, "sorts the faces lexicographically.");
     
     app.get_formatter()->column_width(40);
     CLI11_PARSE(app, argc, argv);
